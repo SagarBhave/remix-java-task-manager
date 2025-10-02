@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Remix Java Task Manager (Single Page)</title>
+  <style>
+    :root{
+      --bg:#0b0f14; --panel:#121821; --muted:#9fb0c3; --text:#e8eef5; --primary:#6ac8ff; --accent:#8fffcc; --danger:#ff7a7a; --warn:#ffd37a;
+      --card:#0f141b; --border:#1f2a3a; --ok:#8fffcc;
+    }
+    *{box-sizing:border-box}
+    body{margin:0; font-family:Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji"; background:linear-gradient(180deg,#0b0f14,#0b0f14 60%, #0f141b); color:var(--text)}
+    a{color:var(--primary)}
+    .container{max-width:1200px;margin:0 auto;padding:24px}
+    .panel{background:var(--panel); border:1px solid var(--border); border-radius:16px; padding:18px; box-shadow:0 10px 30px rgba(0,0,0,.35)}
+    .row{display:flex; gap:16px; align-items:center}
+    .grow{flex:1}
+    .muted{color:var(--muted)}
+    .btn{background:var(--primary); color:#04121f; border:0; padding:10px 14px; border-radius:12px; font-weight:600; cursor:pointer}
+    .btn.secondary{background:#1a2432; color:var(--text); border:1px solid var(--border)}
+    .btn.danger{background:var(--danger); color:#210b0b}
+    .btn.warn{background:var(--warn); color:#211a0b}
+    .btn.small{padding:6px 10px; border-radius:10px; font-size:12px}
+    input, select, textarea{width:100%; background:#0e141c; border:1px solid var(--border); color:var(--text); padding:10px 12px; border-radius:10px; outline:none}
+    textarea{min-height:84px; resize:vertical}
+    h1{font-size:28px;margin:0 0 8px}
+    h2{font-size:18px;margin:0 0 8px}
+    .grid{display:grid; grid-template-columns:repeat(3,1fr); gap:16px}
+    .card{background:var(--card); border:1px solid var(--border); border-radius:14px; padding:12px}
+    .tag{display:inline-flex; padding:4px 8px; border-radius:999px; font-size:12px; border:1px solid var(--border); gap:6px; align-items:center}
+    .status{font-weight:700}
+    .status.todo{color:#a0b3ff}
+    .status.progress{color:#ffd37a}
+    .status.done{color:#8fffcc}
+    .kanban{display:grid; grid-template-columns:repeat(3, 1fr); gap:14px}
+    .col{background:var(--panel); border:1px dashed var(--border); border-radius:16px; padding:10px; min-height:200px}
+    .col h3{margin:6px 8px 10px}
+    .task{background:var(--card); border:1px solid var(--border); border-radius:12px; padding:10px; margin:8px; cursor:grab}
+    .task.dragging{opacity:.6}
+    .label{font-size:12px; color:var(--muted)}
+    .topbar{position:sticky; top:0; backdrop-filter:saturate(140%) blur(6px); background:rgba(11,15,20,.7); z-index:10; border-bottom:1px solid rgba(255,255,255,.05)}
+    .topbar .container{padding:12px 24px}
+    .spacer{height:8px}
+    .pill{border:1px solid var(--border); padding:6px 10px; border-radius:999px}
+    .auth{max-width:440px; margin:8vh auto}
+    .tabs{display:flex; gap:6px; margin-bottom:10px}
+    .tab{flex:1; text-align:center; padding:10px; border:1px solid var(--border); border-radius:10px; cursor:pointer; background:#0e141c}
+    .tab.active{background:var(--primary); color:#04121f; font-weight:700}
+    .footer{margin-top:20px; text-align:center; color:var(--muted); font-size:12px}
+    .empty{color:var(--muted); padding:10px}
+    .right{margin-left:auto}
+    .mono{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size:12px}
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="container row">
+      <div class="row" style="gap:10px">
+        <span class="pill">🗂️ Remix Java Task Manager</span>
+        <span class="muted mono" id="env-info"></span>
+      </div>
+      <div class="right row" style="gap:8px">
+        <span class="muted" id="welcome"></span>
+        <button class="btn small secondary" id="btn-logout" title="Log out">Log out</button>
+      </div>
+    </div>
+  </div>
+
+  <main class="container">
+    <!-- Auth -->
+    <section id="auth" class="auth panel" hidden>
+      <div class="tabs">
+        <button class="tab active" data-tab="login">Log in</button>
+        <button class="tab" data-tab="signup">Sign up</button>
+      </div>
+      <div id="login-form">
+        <div class="spacer"></div>
+        <label class="label">Email</label>
+        <input id="login-email" type="email" placeholder="you@company.com" />
+        <div class="spacer"></div>
+        <label class="label">Password</label>
+        <input id="login-password" type="password" placeholder="••••••••" />
+        <div class="spacer"></div>
+        <button class="btn" id="btn-login">Log in</button>
+      </div>
+      <div id="signup-form" hidden>
+        <div class="spacer"></div>
+        <label class="label">Name</label>
+        <input id="signup-name" type="text" placeholder="Ada Lovelace" />
+        <div class="spacer"></div>
+        <label class="label">Email</label>
+        <input id="signup-email" type="email" placeholder="ada@example.com" />
+        <div class="spacer"></div>
+        <label class="label">Password</label>
+        <input id="signup-password" type="password" placeholder="Create a strong password" />
+        <div class="spacer"></div>
+        <button class="btn" id="btn-signup">Create account</button>
+      </div>
+      <p class="footer">Accounts, sessions, and tasks are stored in <strong>localStorage</strong> with SHA‑256 password hashing (client‑side) so you can push this file to GitHub and run it statically.</p>
+    </section>
+
+    <!-- App -->
+    <section id="app" hidden>
+      <div class="panel">
+        <div class="row" style="align-items:flex-end">
+          <div class="grow">
+            <h1>Tasks</h1>
+            <div class="muted">Create, assign, drag between statuses. Everything stays in your browser.</div>
+          </div>
+          <div class="row" style="gap:8px">
+            <select id="filter-assignee" title="Filter by assignee" class="pill"></select>
+            <select id="filter-owned" title="Creator filter" class="pill">
+              <option value="all">All creators</option>
+              <option value="me">Created by me</option>
+            </select>
+            <button id="btn-new" class="btn">+ New Task</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="spacer"></div>
+
+      <div class="kanban" id="kanban">
+        <div class="col" data-status="todo">
+          <h3>📝 To Do</h3>
+          <div class="dropzone" id="zone-todo"></div>
+        </div>
+        <div class="col" data-status="inprogress">
+          <h3>🚧 In Progress</h3>
+          <div class="dropzone" id="zone-inprogress"></div>
+        </div>
+        <div class="col" data-status="done">
+          <h3>✅ Done</h3>
+          <div class="dropzone" id="zone-done"></div>
+        </div>
+      </div>
+
+      <div class="spacer"></div>
+      <div class="panel">
+        <h2>All Tasks (table)</h2>
+        <div id="table" class="card"></div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Modal -->
+  <dialog id="modal" style="border:1px solid var(--border);border-radius:16px;padding:0;background:var(--panel);color:var(--text);">
+    <form method="dialog" id="task-form">
+      <div class="panel" style="border:0;border-radius:16px 16px 0 0;">
+        <h2 id="modal-title">New Task</h2>
+        <div class="row">
+          <div class="grow">
+            <label class="label">Title</label>
+            <input id="task-title" required placeholder="Short summary" />
+          </div>
+          <div>
+            <label class="label">Status</label>
+            <select id="task-status">
+              <option value="todo">To Do</option>
+              <option value="inprogress">In Progress</option>
+              <option value="done">Done</option>
+            </select>
+          </div>
+        </div>
+        <div class="spacer"></div>
+        <label class="label">Description</label>
+        <textarea id="task-desc" placeholder="Details..."></textarea>
+        <div class="spacer"></div>
+        <label class="label">Assignee</label>
+        <select id="task-assignee"></select>
+        <div class="row" style="gap:8px; margin-top:14px; justify-content:flex-end">
+          <button class="btn secondary" value="cancel">Cancel</button>
+          <button class="btn" id="btn-save-task" value="default">Save Task</button>
+        </div>
+      </div>
+    </form>
+  </dialog>
+
+  <script>
+  // ---- Storage helpers ----
+  const store = {
+    read(key,fallback){
+      try{ return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback)); }catch(e){ return fallback }
+    },
+    write(key,val){ localStorage.setItem(key, JSON.stringify(val)) }
+  }
+
+  // ---- Crypto (SHA-256) ----
+  async function sha256(text){
+    const enc = new TextEncoder().encode(text)
+    const buf = await crypto.subtle.digest('SHA-256', enc)
+    return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('')
+  }
+
+  // ---- Models ----
+  function uid(){ return Math.random().toString(36).slice(2)+Date.now().toString(36) }
+
+  const Users = {
+    all(){ return store.read('users', []) },
+    getByEmail(email){ return this.all().find(u=>u.email.toLowerCase()===email.toLowerCase()) },
+    async create({name,email,password}){
+      if(this.getByEmail(email)) throw new Error('Email already registered')
+      const user = { id: uid(), name, email, pass: await sha256(password), createdAt: Date.now() }
+      const users = this.all(); users.push(user); store.write('users', users)
+      return user
+    },
+    async checkLogin(email,password){
+      const u = this.getByEmail(email); if(!u) return null
+      const hash = await sha256(password)
+      return u.pass===hash ? u : null
+    }
+  }
+
+  const Session = {
+    set(user){ store.write('session', { id:user.id, email:user.email, name:user.name }) },
+    get(){ return store.read('session', null) },
+    clear(){ localStorage.removeItem('session') }
+  }
+
+  const Tasks = {
+    all(){ return store.read('tasks', []) },
+    save(list){ store.write('tasks', list) },
+    upsert(task){
+      const items = this.all();
+      const i = items.findIndex(t=>t.id===task.id)
+      if(i>=0) items[i]=task; else items.push(task)
+      this.save(items)
+    },
+    del(id){ this.save(this.all().filter(t=>t.id!==id)) },
+  }
+
+  // ---- UI Elements ----
+  const el = id => document.getElementById(id)
+  const authView = el('auth'), appView = el('app'), welcome = el('welcome')
+  const btnLogout = el('btn-logout'), envInfo = el('env-info')
+  const filterAssignee = el('filter-assignee'), filterOwned = el('filter-owned')
+  const modal = el('modal'), taskAssignee = el('task-assignee'), taskStatus = el('task-status'), taskTitle=el('task-title'), taskDesc=el('task-desc'), modalTitle=el('modal-title')
+  const zones = { todo: el('zone-todo'), inprogress: el('zone-inprogress'), done: el('zone-done') }
+
+  // ---- Auth UI ----
+  const tabs = document.querySelectorAll('.tab')
+  const loginForm = el('login-form'), signupForm = el('signup-form')
+  tabs.forEach(tab=>tab.addEventListener('click',()=>{
+    tabs.forEach(t=>t.classList.remove('active'))
+    tab.classList.add('active')
+    const k = tab.dataset.tab
+    loginForm.hidden = k!=='login'; signupForm.hidden = k!=='signup'
+  }))
+
+  el('btn-signup').addEventListener('click', async ()=>{
+    try{
+      const name = el('signup-name').value.trim()
+      const email = el('signup-email').value.trim()
+      const pass = el('signup-password').value
+      if(!name||!email||!pass) throw new Error('Fill all fields')
+      const user = await Users.create({name,email,password:pass})
+      Session.set(user)
+      init()
+    }catch(e){ alert(e.message) }
+  })
+
+  el('btn-login').addEventListener('click', async ()=>{
+    const email = el('login-email').value.trim()
+    const pass = el('login-password').value
+    const ok = await Users.checkLogin(email, pass)
+    if(ok){ Session.set(ok); init() } else alert('Invalid credentials')
+  })
+
+  btnLogout.addEventListener('click', ()=>{ Session.clear(); init() })
+
+  // ---- Task UI ----
+  function renderFilters(){
+    const u = Session.get(); const users = Users.all()
+    filterAssignee.innerHTML = '<option value="all">All assignees</option>' + users.map(x=>`<option value="${x.id}">${x.name}</option>`).join('')
+    filterOwned.value = 'all'
+  }
+
+  function renderAssigneeOptions(){
+    const users = Users.all(); const u = Session.get()
+    taskAssignee.innerHTML = users.map(x=>`<option value="${x.id}" ${u&&x.id===u.id?'selected':''}>${x.name}</option>`).join('')
+  }
+
+  function statusLabel(s){
+    return s==='todo'?'To Do':(s==='inprogress'?'In Progress':'Done')
+  }
+
+  function userName(id){ const u=Users.all().find(x=>x.id===id); return u?u.name:'—' }
+
+  function renderKanban(){
+    const u = Session.get(); const tasks = Tasks.all()
+    const aFilter = filterAssignee.value; const cFilter=filterOwned.value
+    const filtered = tasks.filter(t=> (aFilter==='all'||t.assignee===aFilter) && (cFilter==='all'||t.creator===u.id))
+    Object.values(zones).forEach(z=>z.innerHTML='')
+    if(filtered.length===0){ zones.todo.innerHTML = '<div class="empty">No tasks yet. Click <strong>+ New Task</strong>.</div>' }
+
+    for(const t of filtered){
+      const div = document.createElement('div'); div.className='task'; div.draggable=true; div.dataset.id=t.id
+      div.innerHTML = `
+        <div class="row" style="justify-content:space-between; gap:8px">
+          <strong>${escapeHtml(t.title)}</strong>
+          <span class="tag"><span class="status ${t.status==='todo'?'todo':t.status==='inprogress'?'progress':'done'}">${statusLabel(t.status)}</span></span>
+        </div>
+        <div class="muted" style="margin:4px 0 8px">Assigned to <strong>${escapeHtml(userName(t.assignee))}</strong></div>
+        <div class="muted" style="white-space:pre-wrap">${escapeHtml(t.description||'')}</div>
+        <div class="row" style="gap:6px; margin-top:8px">
+          <button class="btn small secondary" data-act="edit">Edit</button>
+          <button class="btn small danger" data-act="del">Delete</button>
+        </div>`
+      div.addEventListener('dragstart',e=>{ div.classList.add('dragging'); e.dataTransfer.setData('text/plain', t.id) })
+      div.addEventListener('dragend',()=>div.classList.remove('dragging'))
+      div.addEventListener('click', (e)=>{
+        const btn = e.target.closest('button'); if(!btn) return
+        if(btn.dataset.act==='edit') openModal(t)
+        if(btn.dataset.act==='del') { if(confirm('Delete task?')){ Tasks.del(t.id); renderAll() } }
+      })
+      zones[t.status].appendChild(div)
+    }
+  }
+
+  function renderTable(){
+    const tasks = Tasks.all();
+    const rows = tasks.map(t=>`<tr>
+      <td>${escapeHtml(t.title)}</td>
+      <td>${escapeHtml(userName(t.assignee))}</td>
+      <td>${statusLabel(t.status)}</td>
+      <td class="muted">${new Date(t.updatedAt||t.createdAt).toLocaleString()}</td>
+    </tr>`).join('')
+    el('table').innerHTML = `<div style="overflow:auto"><table style="width:100%; border-collapse:collapse">
+      <thead><tr><th style="text-align:left;padding:8px">Title</th><th style="text-align:left;padding:8px">Assignee</th><th style="text-align:left;padding:8px">Status</th><th style="text-align:left;padding:8px">Updated</th></tr></thead>
+      <tbody>${rows||'<tr><td colspan="4" class="empty">No tasks</td></tr>'}</tbody>
+    </table></div>`
+  }
+
+  function renderAll(){ renderFilters(); renderKanban(); renderTable() }
+
+  // ---- DnD dropzones ----
+  for(const [key, zone] of Object.entries(zones)){
+    const parent = zone.parentElement
+    parent.addEventListener('dragover', e=>{ e.preventDefault(); parent.style.background='#151d29' })
+    parent.addEventListener('dragleave', ()=>{ parent.style.background='' })
+    parent.addEventListener('drop', e=>{
+      e.preventDefault(); parent.style.background=''
+      const id = e.dataTransfer.getData('text/plain');
+      const items = Tasks.all(); const t = items.find(x=>x.id===id); if(!t) return
+      t.status = parent.dataset.status; t.updatedAt = Date.now(); Tasks.save(items); renderAll()
+    })
+  }
+
+  // ---- Modal ----
+  const btnNew = document.getElementById('btn-new')
+  let editing = null
+  btnNew.addEventListener('click', ()=>openModal())
+
+  function openModal(task){
+    editing = task||null
+    modalTitle.textContent = editing? 'Edit Task' : 'New Task'
+    renderAssigneeOptions()
+    taskTitle.value = editing? editing.title : ''
+    taskDesc.value = editing? editing.description : ''
+    taskStatus.value = editing? editing.status : 'todo'
+    if(editing) taskAssignee.value = editing.assignee
+    modal.showModal()
+  }
+
+  document.getElementById('task-form').addEventListener('close', ()=>{})
+  document.getElementById('btn-save-task').addEventListener('click', (e)=>{
+    e.preventDefault()
+    const u = Session.get(); if(!u) return
+    const payload = {
+      id: editing? editing.id : uid(),
+      title: taskTitle.value.trim(),
+      description: taskDesc.value.trim(),
+      status: taskStatus.value,
+      assignee: taskAssignee.value,
+      creator: editing? editing.creator : u.id,
+      createdAt: editing? editing.createdAt : Date.now(),
+      updatedAt: Date.now()
+    }
+    if(!payload.title) return alert('Title is required')
+    Tasks.upsert(payload)
+    modal.close(); renderAll()
+  })
+
+  filterAssignee.addEventListener('change', renderAll)
+  filterOwned.addEventListener('change', renderAll)
+
+  // ---- Init ----
+  function init(){
+    const s = Session.get();
+    btnLogout.style.display = s? 'inline-flex' : 'none'
+    if(!s){
+      authView.hidden = false; appView.hidden = true; welcome.textContent = ''
+    }else{
+      welcome.textContent = `Signed in as ${s.name}`
+      authView.hidden = true; appView.hidden = false
+      // Seed demo users if first run
+      if(Users.all().length===1){
+        // add two more users to enable assignment
+        (async()=>{
+          try{
+            await Users.create({name:'Grace Hopper', email:'grace@example.com', password:'test1234'})
+            await Users.create({name:'Linus Torvalds', email:'linus@example.com', password:'test1234'})
+            renderAll()
+          }catch(_){}
+        })()
+      }
+      renderAll()
+    }
+  }
+
+  function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m])) }
+
+  envInfo.textContent = 'Local, single-file, no server'
+  init()
+  </script>
+</body>
+</html>
